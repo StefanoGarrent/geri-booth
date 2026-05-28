@@ -86,13 +86,56 @@
         <!-- Flash effect -->
         <div class="flash-overlay" id="flash-overlay"></div>
 
-        <!-- No camera / error -->
+        <!-- No camera / Prompt overlay -->
         <div class="no-camera-msg" id="no-camera-msg" style="display:none;">
-          <div class="cam-off-icon">📵</div>
-          <div class="camera-error">
-            <h3>Kamera tidak terdeteksi</h3>
-            <p>Izinkan akses kamera di browser kamu, kemudian refresh halaman ini.</p>
-            <button class="btn-secondary" id="btn-retry-cam">🔄 Coba Lagi</button>
+          <div class="camera-prompt-card glass-card" id="camera-prompt-card">
+            <!-- State 1: Request Permission (Welcome) -->
+            <div id="cam-state-request" class="cam-state-view">
+              <div class="prompt-icon-wrap pulsing">
+                <span class="prompt-icon">📸</span>
+              </div>
+              <h2 class="prompt-title">Siap untuk Bergaya? ✨</h2>
+              <p class="prompt-desc">geri.booth memerlukan izin akses kamera kamu untuk mengambil foto secara langsung di sini.</p>
+              <button class="btn-primary btn-allow-camera" id="btn-start-camera-prompt">
+                <span>🎥</span> Aktifkan Kamera Sekarang
+              </button>
+              <div class="secure-badge">
+                <span>🔒</span> Koneksi Aman & Privasi Terjaga
+              </div>
+            </div>
+
+            <!-- State 2: Error / Blocked Instruction -->
+            <div id="cam-state-error" class="cam-state-view" style="display:none;">
+              <div class="prompt-icon-wrap error-icon">
+                <span class="prompt-icon">📵</span>
+              </div>
+              <h2 class="prompt-title">Akses Kamera Terhambat</h2>
+              <p class="prompt-desc error-text" id="camera-error-message">
+                Izinkan akses kamera di browser kamu, kemudian klik coba lagi.
+              </p>
+              
+              <div class="instruction-box">
+                <h4>Cara Mengizinkan Akses Kamera:</h4>
+                <ol class="step-list">
+                  <li>
+                    <span class="step-num">1</span>
+                    <span>Klik ikon <strong>Gembok 🔒</strong> atau <strong>Kamera 📹</strong> di kiri atas kolom URL browser kamu.</span>
+                  </li>
+                  <li>
+                    <span class="step-num">2</span>
+                    <span>Ubah status izin Kamera menjadi <strong style="color: var(--accent-cyan);">"Izinkan" (Allow)</strong>.</span>
+                  </li>
+                  <li>
+                    <span class="step-num">3</span>
+                    <span>Pastikan kamera tidak sedang dipakai aplikasi lain (Zoom, Google Meet, WA, dll).</span>
+                  </li>
+                </ol>
+              </div>
+
+              <div class="error-actions">
+                <button class="btn-secondary" id="btn-retry-cam">🔄 Coba Hubungkan Kembali</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

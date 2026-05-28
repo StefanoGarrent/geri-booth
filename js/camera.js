@@ -10,6 +10,12 @@ const CameraManager = (() => {
 
   const video = document.getElementById('camera-video');
   const noCamMsg = document.getElementById('no-camera-msg');
+  
+  // Custom states selectors
+  const btnStartCamPrompt = document.getElementById('btn-start-camera-prompt');
+  const stateRequest = document.getElementById('cam-state-request');
+  const stateError = document.getElementById('cam-state-error');
+  const errMessage = document.getElementById('camera-error-message');
 
   async function init() {
     // Check if browser supports getUserMedia
@@ -18,8 +24,58 @@ const CameraManager = (() => {
       return;
     }
 
+    // Bind local UI buttons
+    if (btnStartCamPrompt) {
+      btnStartCamPrompt.addEventListener('click', async () => {
+        const originalText = btnStartCamPrompt.innerHTML;
+        btnStartCamPrompt.disabled = true;
+        btnStartCamPrompt.innerHTML = '<span>⏳</span> Menghubungkan Kamera...';
+        
+        try {
+          await runCameraSetup();
+        } catch (err) {
+          // Restore button
+          btnStartCamPrompt.disabled = false;
+          btnStartCamPrompt.innerHTML = originalText;
+        }
+      });
+    }
+
+    // Check permission state first if supported
     try {
-      // Try to enumerate devices first (may be empty without permission yet)
+      if (navigator.permissions && navigator.permissions.query) {
+        const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+        
+        if (permissionStatus.state === 'granted') {
+          // Already allowed, start camera immediately
+          await runCameraSetup();
+          return;
+        } else if (permissionStatus.state === 'denied') {
+          // Explicitly blocked, show guide
+          showNoCameraError({ name: 'NotAllowedError' });
+          return;
+        } else {
+          // Prompt (undecided), show request screen
+          showRequestState();
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Permissions query API not supported, attempting auto-setup:', e);
+    }
+
+    // Fallback: If query fails or isn't supported, we try to run camera setup automatically.
+    // If it fails, showRequestState() is a great fallback so it doesn't just error out.
+    try {
+      await runCameraSetup();
+    } catch (err) {
+      // If direct request fails on load, show request screen instead of error screen
+      showRequestState();
+    }
+  }
+
+  async function runCameraSetup() {
+    try {
       await refreshDevices();
 
       const frontCamera = devices.find(d =>
@@ -31,9 +87,17 @@ const CameraManager = (() => {
 
       await startStream(deviceId);
     } catch (err) {
-      console.error('Camera init error:', err);
+      console.error('runCameraSetup failed:', err);
       showNoCameraError(err);
+      throw err;
     }
+  }
+
+  function showRequestState() {
+    if (noCamMsg) noCamMsg.style.display = 'flex';
+    if (stateRequest) stateRequest.style.display = 'block';
+    if (stateError) stateError.style.display = 'none';
+    video.style.display = 'none';
   }
 
   async function refreshDevices() {
@@ -149,21 +213,24 @@ const CameraManager = (() => {
 
   function showNoCameraError(err) {
     if (noCamMsg) noCamMsg.style.display = 'flex';
+    if (stateRequest) stateRequest.style.display = 'none';
+    if (stateError) stateError.style.display = 'block';
     video.style.display = 'none';
 
     const messages = {
-      NotAllowedError:     '🔒 Akses kamera ditolak. Klik ikon kunci/kamera di address bar browser, lalu pilih "Izinkan", kemudian refresh halaman.',
-      PermissionDeniedError: '🔒 Akses kamera ditolak. Izinkan akses kamera di pengaturan browser, lalu refresh halaman.',
-      NotFoundError:       '📵 Tidak ada kamera yang ditemukan di perangkat ini.',
-      NotReadableError:    '⚠️ Kamera sedang digunakan oleh aplikasi lain. Tutup aplikasi lain, lalu coba lagi.',
-      OverconstrainedError:'⚙️ Kamera tidak mendukung resolusi yang diminta. Coba lagi.',
-      NotSupportedError:   '❌ Browser kamu tidak mendukung akses kamera. Gunakan Chrome, Edge, atau Firefox terbaru.',
-      SecurityError:       '🔐 Akses kamera diblokir oleh pengaturan keamanan. Pastikan website dibuka via HTTPS.',
+      NotAllowedError:     '🔒 Akses kamera ditolak. Browser kamu memblokir izin kamera untuk geri.booth.',
+      PermissionDeniedError: '🔒 Akses kamera ditolak. Browser kamu memblokir izin kamera untuk geri.booth.',
+      NotFoundError:       '📵 Tidak ada perangkat kamera yang terdeteksi di komputer atau HP kamu.',
+      NotReadableError:    '⚠️ Kamera sedang digunakan oleh aplikasi lain (seperti Zoom, Google Meet, Teams, WhatsApp). Tutup aplikasi tersebut lalu klik tombol di bawah.',
+      OverconstrainedError:'⚙️ Kamera tidak mendukung spesifikasi resolusi video geri.booth.',
+      NotSupportedError:   '❌ Browser kamu tidak mendukung perekaman kamera. Gunakan Chrome, Edge, atau Firefox versi terbaru.',
+      SecurityError:       '🔐 Akses kamera diblokir oleh pengaturan keamanan browser. geri.booth harus dibuka dengan koneksi aman (HTTPS).',
     };
 
-    const msg = messages[err.name] || `❌ Gagal mengakses kamera: ${err.message || err.name}`;
-    const errorEl = noCamMsg.querySelector('.camera-error p');
-    if (errorEl) errorEl.textContent = msg;
+    const msg = messages[err.name] || `❌ Gagal membuka kamera: ${err.message || err.name}`;
+    if (errMessage) {
+      errMessage.textContent = msg;
+    }
   }
 
   return {
