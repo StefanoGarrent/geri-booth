@@ -78,12 +78,18 @@ const CameraManager = (() => {
     try {
       await refreshDevices();
 
-      const frontCamera = devices.find(d =>
-        d.label.toLowerCase().includes('front') ||
-        d.label.toLowerCase().includes('depan') ||
-        d.label.toLowerCase().includes('user')
-      );
-      const deviceId = frontCamera ? frontCamera.deviceId : (devices[0] ? devices[0].deviceId : undefined);
+      // Check if we have valid labels (indicating permission was already granted previously)
+      const hasValidLabels = devices.some(d => d.label && d.label.trim().length > 0);
+      
+      let deviceId = undefined;
+      if (hasValidLabels) {
+        const frontCamera = devices.find(d =>
+          d.label.toLowerCase().includes('front') ||
+          d.label.toLowerCase().includes('depan') ||
+          d.label.toLowerCase().includes('user')
+        );
+        deviceId = frontCamera ? frontCamera.deviceId : (devices[0] ? devices[0].deviceId : undefined);
+      }
 
       await startStream(deviceId);
     } catch (err) {
@@ -127,7 +133,7 @@ const CameraManager = (() => {
       },
       // Level 2: Any video, prefer front camera
       {
-        video: { facingMode: 'user' },
+        video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'user' },
         audio: false
       },
       // Level 3: Just any video input
@@ -141,14 +147,29 @@ const CameraManager = (() => {
     for (const constraints of constraintOptions) {
       try {
         stream = await navigator.mediaDevices.getUserMedia(constraints);
-        currentDeviceId = deviceId;
+        
+        // Grab the actual deviceId from the active video track settings if not explicitly selected
+        const activeTrack = stream.getVideoTracks()[0];
+        if (activeTrack && activeTrack.getSettings) {
+          currentDeviceId = activeTrack.getSettings().deviceId || deviceId;
+        } else {
+          currentDeviceId = deviceId;
+        }
+
         video.srcObject = stream;
-        await video.play();
+        
+        // Wrap programmatic play in a try-catch. If browser autoplay restrictions block it,
+        // it shouldn't crash the setup as long as the stream is correctly bound.
+        try {
+          await video.play();
+        } catch (playErr) {
+          console.warn('Programmatic play failed, relying on HTML5 autoplay attribute:', playErr);
+        }
 
         if (noCamMsg) noCamMsg.style.display = 'none';
         video.style.display = 'block';
 
-        // Re-enumerate to get device labels
+        // Re-enumerate to get device labels now that we have permission
         await refreshDevices();
         return; // Success — stop trying
       } catch (err) {
