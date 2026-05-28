@@ -12,12 +12,21 @@ const CameraManager = (() => {
   const noCamMsg = document.getElementById('no-camera-msg');
 
   async function init() {
+    // Check if browser supports getUserMedia
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showNoCameraError({ name: 'NotSupportedError' });
+      return;
+    }
+
     try {
-      // First, enumerate devices
+      // Try to enumerate devices first (may be empty without permission yet)
       await refreshDevices();
 
-      // Start with front camera if available
-      const frontCamera = devices.find(d => d.label.toLowerCase().includes('front') || d.label.toLowerCase().includes('depan'));
+      const frontCamera = devices.find(d =>
+        d.label.toLowerCase().includes('front') ||
+        d.label.toLowerCase().includes('depan') ||
+        d.label.toLowerCase().includes('user')
+      );
       const deviceId = frontCamera ? frontCamera.deviceId : (devices[0] ? devices[0].deviceId : undefined);
 
       await startStream(deviceId);
@@ -28,42 +37,69 @@ const CameraManager = (() => {
   }
 
   async function refreshDevices() {
-    const allDevices = await navigator.mediaDevices.enumerateDevices();
-    devices = allDevices.filter(d => d.kind === 'videoinput');
+    try {
+      const allDevices = await navigator.mediaDevices.enumerateDevices();
+      devices = allDevices.filter(d => d.kind === 'videoinput');
+    } catch (e) {
+      devices = [];
+    }
     return devices;
   }
 
   async function startStream(deviceId) {
-    // Stop existing stream
     stopStream();
 
-    const constraints = {
-      video: {
-        deviceId: deviceId ? { exact: deviceId } : undefined,
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        facingMode: deviceId ? undefined : 'user'
+    // Try 3 levels of constraints — from ideal to bare minimum
+    const constraintOptions = [
+      // Level 1: Full HD preferred
+      {
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: deviceId ? undefined : 'user'
+        },
+        audio: false
       },
-      audio: false
-    };
+      // Level 2: Any video, prefer front camera
+      {
+        video: { facingMode: 'user' },
+        audio: false
+      },
+      // Level 3: Just any video input
+      {
+        video: true,
+        audio: false
+      }
+    ];
 
-    try {
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-      currentDeviceId = deviceId;
-      video.srcObject = stream;
-      await video.play();
-      
-      if (noCamMsg) noCamMsg.style.display = 'none';
-      video.style.display = 'block';
+    let lastErr = null;
+    for (const constraints of constraintOptions) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        currentDeviceId = deviceId;
+        video.srcObject = stream;
+        await video.play();
 
-      // Re-enumerate after stream starts (gets labels)
-      await refreshDevices();
+        if (noCamMsg) noCamMsg.style.display = 'none';
+        video.style.display = 'block';
 
-    } catch (err) {
-      console.error('Stream start error:', err);
-      showNoCameraError(err);
-      throw err;
+        // Re-enumerate to get device labels
+        await refreshDevices();
+        return; // Success — stop trying
+      } catch (err) {
+        lastErr = err;
+        console.warn('Camera constraint failed, trying fallback:', err.name, constraints);
+
+        // Don't retry on permission denied — user explicitly blocked it
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          throw err;
+        }
+      }
     }
+
+    // All levels failed
+    throw lastErr;
   }
 
   function stopStream() {
@@ -78,7 +114,6 @@ const CameraManager = (() => {
       showToast('Hanya ada 1 kamera yang tersedia', 'error');
       return;
     }
-
     const currentIndex = devices.findIndex(d => d.deviceId === currentDeviceId);
     const nextIndex = (currentIndex + 1) % devices.length;
     await startStream(devices[nextIndex].deviceId);
@@ -101,16 +136,11 @@ const CameraManager = (() => {
     canvas.height = vh;
 
     ctx.save();
-
-    // Apply mirror
     if (isMirrored) {
       ctx.translate(vw, 0);
       ctx.scale(-1, 1);
     }
-
-    // Apply filter
     ctx.filter = filterCss || 'none';
-
     ctx.drawImage(video, 0, 0, vw, vh);
     ctx.restore();
 
@@ -121,23 +151,20 @@ const CameraManager = (() => {
     if (noCamMsg) noCamMsg.style.display = 'flex';
     video.style.display = 'none';
 
-    let msg = 'Terjadi kesalahan saat mengakses kamera.';
-    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-      msg = 'Akses kamera ditolak. Klik ikon kunci di address bar dan izinkan akses kamera.';
-    } else if (err.name === 'NotFoundError') {
-      msg = 'Tidak ada kamera yang ditemukan di perangkat ini.';
-    } else if (err.name === 'NotReadableError') {
-      msg = 'Kamera sedang digunakan oleh aplikasi lain.';
-    }
+    const messages = {
+      NotAllowedError:     '🔒 Akses kamera ditolak. Klik ikon kunci/kamera di address bar browser, lalu pilih "Izinkan", kemudian refresh halaman.',
+      PermissionDeniedError: '🔒 Akses kamera ditolak. Izinkan akses kamera di pengaturan browser, lalu refresh halaman.',
+      NotFoundError:       '📵 Tidak ada kamera yang ditemukan di perangkat ini.',
+      NotReadableError:    '⚠️ Kamera sedang digunakan oleh aplikasi lain. Tutup aplikasi lain, lalu coba lagi.',
+      OverconstrainedError:'⚙️ Kamera tidak mendukung resolusi yang diminta. Coba lagi.',
+      NotSupportedError:   '❌ Browser kamu tidak mendukung akses kamera. Gunakan Chrome, Edge, atau Firefox terbaru.',
+      SecurityError:       '🔐 Akses kamera diblokir oleh pengaturan keamanan. Pastikan website dibuka via HTTPS.',
+    };
 
+    const msg = messages[err.name] || `❌ Gagal mengakses kamera: ${err.message || err.name}`;
     const errorEl = noCamMsg.querySelector('.camera-error p');
     if (errorEl) errorEl.textContent = msg;
   }
-
-  function getVideoElement() { return video; }
-  function getStream() { return stream; }
-  function getDevices() { return devices; }
-  function getMirrored() { return isMirrored; }
 
   return {
     init,
@@ -145,10 +172,10 @@ const CameraManager = (() => {
     toggleMirror,
     captureFrame,
     stopStream,
-    getVideoElement,
-    getStream,
-    getDevices,
-    getMirrored
+    getVideoElement: () => video,
+    getStream: () => stream,
+    getDevices: () => devices,
+    getMirrored: () => isMirrored
   };
 })();
 
