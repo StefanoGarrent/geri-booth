@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foto Booth — geri.booth</title>
+  <meta name="description" content="Ambil foto seru, pilih tema & frame, dan download hasilnya di geri.booth.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/booth.css">
+</head>
+<body class="booth-body" id="booth-body">
+
+  <!-- Top Bar -->
+  <header class="booth-topbar">
+    <a href="index.html" class="topbar-logo">
+      <span class="logo-icon">📸</span>
+      <span class="logo-text">geri<span class="logo-dot">.booth</span></span>
+    </a>
+    <div class="topbar-actions">
+      <button class="btn-icon-only" id="btn-help" title="Panduan">❓</button>
+      <button class="btn-icon-only" id="btn-fullscreen" title="Layar Penuh">⛶</button>
+    </div>
+  </header>
+
+  <!-- Booth Main -->
+  <main class="booth-main" id="booth-main">
+
+    <!-- LEFT PANEL: Themes & Layouts & Filters -->
+    <aside class="side-panel" id="panel-left">
+
+      <!-- Themes -->
+      <div class="panel-section">
+        <div class="panel-title">🎨 Tema</div>
+        <div class="theme-grid" id="theme-grid">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <!-- Layout -->
+      <div class="panel-section">
+        <div class="panel-title">📐 Layout</div>
+        <div class="layout-grid" id="layout-grid">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="panel-section">
+        <div class="panel-title">✨ Filter</div>
+        <div class="filter-grid" id="filter-grid">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- CENTER: Camera + Controls -->
+    <section class="camera-area" id="camera-area">
+
+      <div class="camera-view-wrap" id="camera-view-wrap">
+        <!-- Camera grid lines -->
+        <div class="camera-grid-lines"></div>
+        
+        <!-- Camera corners -->
+        <div class="camera-overlay">
+          <div class="camera-corner tl"></div>
+          <div class="camera-corner tr"></div>
+          <div class="camera-corner bl"></div>
+          <div class="camera-corner br"></div>
+        </div>
+
+        <!-- Video element -->
+        <video id="camera-video" autoplay playsinline muted class="mirrored"></video>
+
+        <!-- Countdown overlay -->
+        <div class="countdown-overlay" id="countdown-overlay">
+          <div class="countdown-number" id="countdown-number">3</div>
+        </div>
+
+        <!-- Flash effect -->
+        <div class="flash-overlay" id="flash-overlay"></div>
+
+        <!-- No camera / error -->
+        <div class="no-camera-msg" id="no-camera-msg" style="display:none;">
+          <div class="cam-off-icon">📵</div>
+          <div class="camera-error">
+            <h3>Kamera tidak terdeteksi</h3>
+            <p>Izinkan akses kamera di browser kamu, kemudian refresh halaman ini.</p>
+            <button class="btn-secondary" id="btn-retry-cam">🔄 Coba Lagi</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Camera Controls -->
+      <div class="camera-controls">
+        <button class="btn-control" id="btn-mirror" title="Mirror Kamera">🔄</button>
+        <button class="btn-control" id="btn-switch-cam" title="Ganti Kamera">🔀</button>
+        <button class="btn-shutter" id="btn-shutter" title="Ambil Foto">📷</button>
+        <div class="shots-counter">
+          <span id="shots-taken">0</span>/<span id="shots-needed">4</span> foto
+        </div>
+        <button class="btn-control" id="btn-timer" title="Timer Foto">⏱</button>
+        <button class="btn-control" id="btn-make-strip" title="Buat Strip">🎞</button>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: Photo Strip + Frames + Download -->
+    <aside class="side-panel side-panel-right result-panel" id="panel-right">
+      <div class="panel-section" style="height:100%; display:flex; flex-direction:column;">
+
+        <!-- Shots grid -->
+        <div class="strip-header">
+          <div class="strip-title-wrap">
+            <div class="strip-title">📸 Foto Kamu</div>
+            <div class="strip-count"><span id="shot-count-display">0</span> foto diambil</div>
+          </div>
+          <button class="btn-icon-only" id="btn-clear-shots" title="Hapus Semua">🗑</button>
+        </div>
+
+        <div id="shots-container" style="padding:12px; overflow-y:auto; flex:1;">
+          <div id="shots-grid" class="shots-grid" style="grid-template-columns: 1fr 1fr;">
+            <!-- shot thumbnails populated by JS -->
+          </div>
+        </div>
+
+        <!-- Frames selector -->
+        <div style="padding: 12px 16px; border-top: 1px solid var(--border-subtle);">
+          <div class="panel-title" style="margin-bottom:8px;">🖼️ Frame</div>
+          <div class="frame-grid" id="frame-grid">
+            <!-- frames populated by JS -->
+          </div>
+        </div>
+
+        <!-- Strip canvas preview -->
+        <div class="strip-canvas-wrap" id="strip-canvas-wrap" style="display:none;">
+          <canvas id="strip-canvas"></canvas>
+        </div>
+
+        <!-- Download Actions -->
+        <div class="strip-footer">
+          <button class="btn-download" id="btn-generate" disabled>
+            🎞 Buat Strip Foto
+          </button>
+          <button class="btn-download" id="btn-download" disabled style="background: var(--gradient-purple-cyan);">
+            💾 Download PNG
+          </button>
+          <button class="btn-retake-all" id="btn-retake-all">
+            🔁 Ulangi Semua
+          </button>
+        </div>
+
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Hidden canvas for capture -->
+  <canvas id="capture-canvas" style="display:none;"></canvas>
+
+  <script src="js/themes.js"></script>
+  <script src="js/filters.js"></script>
+  <script src="js/layouts.js"></script>
+  <script src="js/frames.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/strip.js"></script>
+  <script src="js/booth.js"></script>
+</body>
+</html>
